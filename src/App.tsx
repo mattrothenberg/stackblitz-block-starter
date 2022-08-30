@@ -30,17 +30,22 @@ const pkgJson = `
 
 const componentSrc = `
 import { tw } from 'twind'
+import { ReactNode } from 'react'
 
 export interface ButtonProps {
   appearance?: "primary" | "secondary" | "tertiary";
   disabled?: boolean;
+  loading?: boolean;
+  children: ReactNode;
 }
 
-function Button ({appearance = "primary", disabled = false }: ButtonProps) {
-  let buttonClass = tw(["px-3 py-1.5 border text-sm disabled:opacity-50 disabled:cursor-not-allowed", { 'bg-blue-600 text-white border-blue-600': appearance === "primary", 'bg-gray-600 border-gray-600 text-black': appearance === "secondary", 'bg-white text-black': appearance === "tertiary" }]);
+function Button ({appearance = "primary", disabled = false, loading = false, children = '' }: ButtonProps) {
+  let buttonClass = tw(["px-3 py-1.5 font-medium rounded border text-sm disabled:opacity-50 disabled:cursor-not-allowed", { 'bg-blue-600 text-white border-blue-600': appearance === "primary", 'bg-gray-200 border-gray-200 text-gray-900': appearance === "secondary", 'bg-white text-black': appearance === "tertiary" }]);
 
   return (
-    <button disabled={disabled} className={buttonClass}>Press Me</button>
+    <button disabled={disabled || loading} className={buttonClass}>
+      {loading ? 'Loading...' : children}
+    </button>
   )
 }
 
@@ -61,6 +66,9 @@ export default {
 const Template: ComponentStory<typeof Component> = (args) => <Component {...args} />;
 
 export const Primary = Template.bind({});
+Primary.args = {
+  children: ""
+}
 `;
 
 const tsConfigSrc = `
