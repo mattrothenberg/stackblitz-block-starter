@@ -1,28 +1,29 @@
-import { useState, useEffect, useRef } from "react";
 import sdk, { VM } from "@stackblitz/sdk";
+import { useEffect, useRef } from "react";
 
 const pkgJson = `
   {
     "name": "my-project",
     "scripts": {
-      "start": "ladle serve --port 4123",
-      "build": "ladle build"
+      "start": "start-storybook -p 4123"
     },
     "dependencies": {
-      "@ladle/react": "^2.3.0",
       "react": "^18.0.0",
       "react-dom": "^18.0.0",
-      "react-docgen": "latest",
       "twind": "latest"
     },
     "devDependencies": {
       "@types/react": "^17.0.33",
       "@types/react-dom": "^17.0.10",
-      "typescript": "^4.5.4"
+      "typescript": "^4.5.4",
+      "@babel/core": "^7.18.13",
+      "babel-loader": "^8.2.5",
+      "@storybook/addon-essentials": "^6.5.10",
+      "@storybook/react": "^6.5.10"
     },
     "stackblitz": {
       "installDependencies": true,
-      "startCommand": "react-docgen src/component.tsx --pretty --out src/docs.json && npm start"
+      "startCommand": "npm start"
     }
   }
 `;
@@ -30,12 +31,12 @@ const pkgJson = `
 const componentSrc = `
 import { tw } from 'twind'
 
-interface ButtonProps {
+export interface ButtonProps {
   appearance?: "primary" | "secondary" | "tertiary";
   disabled?: boolean;
 }
 
-const Button = ({appearance = "primary", disabled = false }: ButtonProps) => {
+function Button ({appearance = "primary", disabled = false }: ButtonProps) {
   let buttonClass = tw(["px-3 py-1.5 border text-sm disabled:opacity-50 disabled:cursor-not-allowed", { 'bg-blue-600 text-white border-blue-600': appearance === "primary", 'bg-gray-600 border-gray-600 text-black': appearance === "secondary", 'bg-white text-black': appearance === "tertiary" }]);
 
   return (
@@ -47,46 +48,19 @@ export default Button;
 `;
 
 const componentStorySrc = `
-import type { Story } from '@ladle/react';
-import docs from "./docs.json"
-import Component  from "./component.tsx"
+import React from 'react';
+import { ComponentStory, ComponentMeta } from '@storybook/react';
+import Component from './component';
 
-export const Controls: Story = (props) => {
-  return (
-    <>
-     <Component {...props} />
-    </>
-  )
-};
+export default {
+  title: 'Component',
+  component: Component,
+} as ComponentMeta<typeof Component>;
 
-Controls.argTypes = Object.keys(docs.props).reduce((acc, propName) => {
-  let match = docs.props[propName]
+//👇 We create a “template” of how args map to rendering
+const Template: ComponentStory<typeof Component> = (args) => <Component {...args} />;
 
-  switch (match.tsType.name) {
-    case "union":
-      acc[propName] = {
-        options: match.tsType.elements.map(e => e.value.replaceAll('"', '')),
-        control: { type: 'select' }
-      }
-      break;
-    case "boolean":
-      acc[propName] = {
-        control: {type: 'checkbox'},
-        options: ["true", "false"],
-        defaultValue: "false",
-      }
-      break;
-    default:
-      break;
-  }
-
-  return acc;
-}, {})
-
-Controls.storyName = "Story";
-
-
-
+export const Primary = Template.bind({});
 `;
 
 const tsConfigSrc = `
@@ -117,6 +91,60 @@ const tsConfigSrc = `
 }
 `;
 
+const storybookMainSrc = `
+module.exports = {
+  "stories": [
+    "../src/**/*.stories.@(js|jsx|ts|tsx)"
+  ],
+  "addons": [
+    "@storybook/addon-essentials",
+  ],
+  "framework": "@storybook/react",
+  features: {
+    postcss: false,
+  },
+}
+`;
+
+const previewHeadSrc = `
+<script>
+  window.global = window;
+</script>
+`;
+
+const storybookPreviewSrc = `
+export const parameters = {
+  layout: 'centered',
+};
+`;
+
+const storybookManagerSrc = `
+import { addons } from '@storybook/addons';
+
+addons.setConfig({
+  isFullscreen: false,
+  showNav: false,
+  showPanel: true,
+  panelPosition: 'bottom',
+  enableShortcuts: false,
+  showToolbar: true,
+  selectedPanel: undefined,
+  initialActive: 'sidebar',
+  sidebar: {
+    showRoots: false,
+    collapsedRoots: ['other'],
+  },
+  toolbar: {
+    title: { hidden: false },
+    zoom: { hidden: false },
+    eject: { hidden: false },
+    copy: { hidden: false },
+    fullscreen: { hidden: false },
+  },
+});
+
+`;
+
 function App() {
   const vmRef = useRef<VM>(null!);
   useEffect(() => {
@@ -130,6 +158,10 @@ function App() {
           description: "A storybook clone built with Ladle",
           template: "node",
           files: {
+            ".storybook/main.cjs": storybookMainSrc,
+            ".storybook/preview-head.html": previewHeadSrc,
+            ".storybook/preview.cjs": storybookPreviewSrc,
+            ".storybook/manager.js": storybookManagerSrc,
             "src/component.tsx": componentSrc,
             "src/index.stories.tsx": componentStorySrc,
             "package.json": pkgJson,
@@ -142,6 +174,10 @@ function App() {
           theme: "light",
           openFile: "src/component.tsx",
           terminalHeight: 0,
+          view: "preview",
+          hideExplorer: true,
+          hideNavigation: true,
+          hideDevTools: true,
         }
       );
     };
